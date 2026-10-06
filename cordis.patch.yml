@@ -1,0 +1,23 @@
+# The layer this package contributes when it is selected as a profile BUNDLE.
+#
+# There are two ways to install this skin, and they differ only in who writes
+# the row:
+#
+#   1. `node install.mjs`  — recommended. Copies the package into the profile's
+#      node_modules and appends the block below to the profile's own
+#      cordis.patch.yml. Works for the `desktop` profile, which the dsh CLI
+#      refuses to manage ("managed exclusively by the Electron application").
+#
+#   2. Add `deepseek-harness-skin` to `dsh.profile.bundles` in the profile's
+#      package.json. The launcher then applies this file for you. Use this for a
+#      `web` profile you install with `dsh plugin --profile web add`.
+#
+# ── WHY `insert` AND NOT `- id: deepseek-harness-skin` ───────────────────────────────
+#
+# A patch entry with an `id` and no `insert` is an OVERRIDE: it looks for an
+# existing row with that id, and when there is none it warns and is skipped.
+# That form is the obvious-looking way to write this file and it installs
+# nothing at all — no error, no row, no skin. Adding a row requires `insert`.
+- insert:
+    - id: deepseek-harness-skin
+      name: deepseek-harness-skin
