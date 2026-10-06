@@ -1,0 +1,48 @@
+{
+  "name": "deepseek-harness-skin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local custom skins for DeepSeek Harness: upload your own wallpaper, colour each shell region independently and frame the picture. The official look stays the default and comes back pixel for pixel.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "build.mjs",
+    "install.mjs",
+    "cordis.patch.yml",
+    "assets",
+    "src",
+    "README.md"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.2 <0.3.0"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "skin",
+    "theme",
+    "wallpaper",
+    "appearance",
+    "cordis"
+  ],
+  "license": "MIT"
+}
