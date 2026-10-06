@@ -1,0 +1,20 @@
+{
+  "$comment": "No bundled skins or artwork. Palettes are internal styling foundations for user-created skins, never gallery entries. Uploaded original image bytes live only in the user's IndexedDB.",
+  "series": {
+    "id": "deepseek-harness-skin",
+    "title": "Skin settings",
+    "testedDsh": "0.2.0-rc.2"
+  },
+  "defaults": {
+    "skin": "off",
+    "artOpacity": 1,
+    "veil": 0
+  },
+  "skins": [],
+  "palettes": [
+    { "id": "studio", "accent": "#b8563f" },
+    { "id": "neon", "accent": "#0e8f9e" },
+    { "id": "sakura", "accent": "#d9748f" },
+    { "id": "film", "accent": "#6f7f47" }
+  ]
+}
