@@ -1,0 +1,534 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DeepSeek Harness skin plugin — the switcher panel.
+
+   The panel is the plugin's own surface, not a shell slot. That is a deliberate
+   trade: it costs the shell's visual integration, and buys three things a slot
+   cannot promise — it keeps working when the settings registry changes shape
+   between DSH versions, it renders identically whether or not the dynamic
+   client half can reach that registry, and it can be given whatever layout the
+   skin needs instead of whatever a settings row allows.
+
+   It is ALSO part of the skin: every colour below falls back to a neutral
+   default and is then overridden by the active skin's `--skin-panel-*` values, so
+   the switcher re-skins itself the instant you use it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#deepseek-harness-skin-dock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  font: 400 13px/1.45 system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  color: var(--skin-panel-fg, #f4ece5);
+  -webkit-font-smoothing: antialiased;
+}
+
+#deepseek-harness-skin-dock * {
+  box-sizing: border-box;
+}
+
+/* ── Launcher: the application's whale silhouette, without a label. ─────── */
+
+#deepseek-harness-skin-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 8px;
+  margin: 0;
+  appearance: none;
+  cursor: pointer;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  background: rgba(255, 255, 255, 0.94);
+  color: #000;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+#deepseek-harness-skin-handle [data-role='whale'] {
+  display: block;
+  width: 26px;
+  height: 20px;
+  pointer-events: none;
+}
+
+#deepseek-harness-skin-handle:hover {
+  transform: translateY(-1px);
+  border-color: var(--skin-accent, #b8563f);
+}
+
+#deepseek-harness-skin-handle:focus-visible,
+#deepseek-harness-skin-panel :focus-visible {
+  outline: 2px solid var(--skin-accent, #b8563f);
+  outline-offset: 2px;
+}
+
+/* ── Panel shell ────────────────────────────────────────────────────────── */
+
+#deepseek-harness-skin-panel {
+  width: 340px;
+  max-height: min(74vh, 640px);
+  overflow: hidden auto;
+  border-radius: 16px;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  background: var(--skin-panel-bg, rgba(28, 24, 22, 0.9));
+  box-shadow: var(--skin-panel-shadow, 0 18px 48px rgba(0, 0, 0, 0.44));
+  backdrop-filter: blur(20px) saturate(1.25);
+}
+
+/* Closing is animated but opening is not: the panel must be measurable the
+   moment it is shown, or the outside-click handler races its own geometry. */
+#deepseek-harness-skin-dock[data-open='false'] #deepseek-harness-skin-panel {
+  display: none;
+}
+
+#deepseek-harness-skin-panel [data-role='head'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.14));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(var(--skin-panel-bg, #1c1816), var(--skin-panel-bg, #1c1816)), #17222b;
+}
+
+#deepseek-harness-skin-panel [data-role='title'] {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#deepseek-harness-skin-panel [data-role='subtitle'] {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--skin-panel-muted, rgba(244, 236, 229, 0.62));
+}
+
+#deepseek-harness-skin-panel [data-role='body'] {
+  padding: 12px;
+}
+
+#deepseek-harness-skin-panel [data-role='foot'] {
+  padding: 10px 14px 13px;
+  border-top: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.14));
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--skin-panel-muted, rgba(244, 236, 229, 0.62));
+}
+
+#deepseek-harness-skin-panel [data-role='foot'] b {
+  color: var(--skin-panel-fg, #f4ece5);
+  font-weight: 600;
+}
+
+#deepseek-harness-skin-panel [data-role='foot'] [data-tone='warn'] {
+  color: #f0b429;
+}
+
+/* ── Skin gallery ───────────────────────────────────────────────────────── */
+
+#deepseek-harness-skin-panel [data-role='grid'] {
+  display: grid;
+  gap: 8px;
+  max-height: 244px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#deepseek-harness-skin-panel [data-role='card'] {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 8px 11px 8px 8px;
+  margin: 0;
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: var(--skin-panel-raised, rgba(255, 255, 255, 0.06));
+  color: inherit;
+  font: inherit;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+#deepseek-harness-skin-panel [data-role='card']:hover {
+  transform: translateX(2px);
+  border-color: var(--skin-panel-stroke, rgba(255, 255, 255, 0.2));
+}
+
+#deepseek-harness-skin-panel [data-role='card'][aria-pressed='true'] {
+  border-color: var(--skin-accent, #b8563f);
+  background: color-mix(in srgb, var(--skin-accent, #b8563f) 16%, transparent);
+}
+
+/* The thumbnail and wallpaper share the same uploaded or bundled image. */
+#deepseek-harness-skin-panel [data-role='thumb'] {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image: var(--skin-thumb, none);
+  background-size: cover;
+  background-position: center 18%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+#deepseek-harness-skin-panel [data-role='thumb'][data-art='missing'] {
+  background-image: linear-gradient(135deg, var(--skin-accent, #b8563f), transparent 70%);
+}
+
+#deepseek-harness-skin-panel [data-role='name'] {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#deepseek-harness-skin-panel [data-role='tick'] {
+  font-size: 12px;
+  opacity: 0;
+  color: var(--skin-accent, #b8563f);
+}
+
+#deepseek-harness-skin-panel [data-role='card'][aria-pressed='true'] [data-role='tick'] {
+  opacity: 1;
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+#deepseek-harness-skin-panel [data-role='controls'] {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.14));
+}
+
+#deepseek-harness-skin-panel [data-role='controls'][hidden] {
+  display: none;
+}
+
+#deepseek-harness-skin-panel [hidden] {
+  display: none !important;
+}
+
+#deepseek-harness-skin-panel [data-role='section-head'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 7px 0 2px;
+}
+
+#deepseek-harness-skin-panel [data-role='body'] button:not([data-role='card']) {
+  appearance: none;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  border-radius: 7px;
+  padding: 6px 9px;
+  color: inherit;
+  background: var(--skin-panel-raised, rgba(255, 255, 255, 0.06));
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+#deepseek-harness-skin-panel [data-role='art-actions'],
+#deepseek-harness-skin-panel [data-role='color-row'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#deepseek-harness-skin-panel [data-role='color-row'] input[type='color'] {
+  width: 48px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel input[type='text'],
+#deepseek-harness-skin-panel select {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  border-radius: 7px;
+  background: var(--skin-panel-bg, #1c1816);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+#deepseek-harness-skin-panel input::placeholder {
+  color: var(--skin-panel-muted, rgba(244, 236, 229, 0.62));
+}
+
+#deepseek-harness-skin-panel [data-role='new-skin'] {
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  border-radius: 9px;
+}
+
+#deepseek-harness-skin-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#deepseek-harness-skin-panel [data-role='field'] {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+
+#deepseek-harness-skin-panel [data-role='new-color-row'],
+#deepseek-harness-skin-panel [data-role='region-color-row'] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#deepseek-harness-skin-panel [data-role='new-color'],
+#deepseek-harness-skin-panel [data-role='region-color'],
+#deepseek-harness-skin-panel [data-role='region-text'] {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--skin-panel-stroke);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel :is([data-role='new-color-row'], [data-role='region-color-row']) input:is([data-role='new-hue'], [data-role='region-hue']) {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+}
+
+#deepseek-harness-skin-panel :is([data-role='new-color-row'], [data-role='region-color-row']) input:is([data-role='new-hue'], [data-role='region-hue'])::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(to right, #ff4b4b, #ffe34b, #55d96b, #43d9e8, #4c70ff, #c658f0, #ff4b4b);
+}
+
+#deepseek-harness-skin-panel :is([data-role='new-color-row'], [data-role='region-color-row']) input:is([data-role='new-hue'], [data-role='region-hue'])::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -3px;
+  border: 3px solid #fff;
+  background: var(--skin-hue-thumb, #f4d9e3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+#deepseek-harness-skin-panel :is([data-role='new-color-row'], [data-role='region-color-row']) input:is([data-role='new-hue'], [data-role='region-hue'])::-moz-range-track {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(to right, #ff4b4b, #ffe34b, #55d96b, #43d9e8, #4c70ff, #c658f0, #ff4b4b);
+}
+
+#deepseek-harness-skin-panel :is([data-role='new-color-row'], [data-role='region-color-row']) input:is([data-role='new-hue'], [data-role='region-hue'])::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--skin-hue-thumb, #f4d9e3);
+}
+
+#deepseek-harness-skin-panel [data-role='new-color-value'] {
+  color: var(--skin-panel-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#deepseek-harness-skin-panel [data-role='region-text-row'] {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+
+#deepseek-harness-skin-panel [data-role='region-auto-text'] {
+  padding: 5px 9px;
+  border: 1px solid var(--skin-panel-stroke);
+  border-radius: 7px;
+  background: var(--skin-panel-raised);
+  color: inherit;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel [data-role='region-auto-text'][aria-pressed='true'] {
+  border-color: var(--skin-accent);
+}
+
+#deepseek-harness-skin-panel [data-role='region-status'] {
+  margin-left: auto;
+  color: var(--skin-panel-muted);
+}
+
+#deepseek-harness-skin-panel [data-role='region-opacity-value'] {
+  color: var(--skin-panel-fg);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#deepseek-harness-skin-panel [data-role='message'] {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#deepseek-harness-skin-panel [data-role='message']:empty {
+  display: none;
+}
+
+#deepseek-harness-skin-panel [data-tone='error'] {
+  color: #ffa4a4;
+}
+
+#deepseek-harness-skin-panel [data-role='control'] {
+  display: grid;
+  grid-template-columns: 62px 1fr 38px;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  color: var(--skin-panel-muted, rgba(244, 236, 229, 0.62));
+}
+
+#deepseek-harness-skin-panel [data-role='framing-head'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+#deepseek-harness-skin-panel [data-role='reset-framing'],
+#deepseek-harness-skin-panel [data-fit] {
+  appearance: none;
+  border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
+  border-radius: 7px;
+  padding: 5px 9px;
+  color: inherit;
+  background: var(--skin-panel-raised, rgba(255, 255, 255, 0.06));
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel [data-role='fit-options'] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+
+#deepseek-harness-skin-panel [data-fit][aria-pressed='true'] {
+  border-color: var(--skin-accent, #b8563f);
+  background: color-mix(in srgb, var(--skin-accent, #b8563f) 16%, transparent);
+}
+
+#deepseek-harness-skin-panel [data-role='framing-hint'],
+#deepseek-harness-skin-panel [data-role='effects-hint'] {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--skin-panel-muted, rgba(244, 236, 229, 0.62));
+}
+
+#deepseek-harness-skin-panel [data-role='levels-title'] {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.14));
+  font-weight: 600;
+}
+
+#deepseek-harness-skin-panel [data-role='control'] [data-role='value'] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--skin-panel-fg, #f4ece5);
+}
+
+#deepseek-harness-skin-panel input[type='range'] {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+#deepseek-harness-skin-panel input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--skin-panel-fg, #f4ece5) 22%, transparent);
+}
+
+#deepseek-harness-skin-panel input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--skin-accent, #b8563f);
+  border: 2px solid var(--skin-panel-bg, #1c1816);
+}
+
+#deepseek-harness-skin-panel input[type='range']::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--skin-panel-fg, #f4ece5) 22%, transparent);
+}
+
+#deepseek-harness-skin-panel input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--skin-accent, #b8563f);
+  border: 2px solid var(--skin-panel-bg, #1c1816);
+}
+
+/* ── Small viewports ────────────────────────────────────────────────────────
+   Phone-width windows get a sheet rather than a floating card: a 340px popover
+   on a 380px window is a popover that covers the thing you are switching.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  #deepseek-harness-skin-dock {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    align-items: stretch;
+  }
+
+  #deepseek-harness-skin-panel {
+    width: auto;
+    max-height: 62vh;
+  }
+
+  #deepseek-harness-skin-handle {
+    align-self: flex-end;
+  }
+}
