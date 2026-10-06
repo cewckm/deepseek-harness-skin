@@ -4,6 +4,12 @@ Local wallpapers and per-region colours for DeepSeek Harness. The black whale in
 the bottom-right corner opens the panel; colour, picture and framing changes take
 effect immediately.
 
+Drag the panel by its `外观设置` (Appearance settings) title bar to move it out of
+the way. The position is saved on the machine when you let go, and the panel
+reopens where you left it; it stays inside the visible window when the window or
+the panel changes size. The whale keeps its corner, and the close button, the
+colour strip and the other controls keep working while you drag.
+
 The official look is the default. Selecting it keeps DSH's own background, region
 colours and theme tokens — wallpaper, dimming and region overrides are all off,
 and only the settings entry point remains. The official look comes back pixel for
@@ -130,8 +136,8 @@ dimming to 0% to see the original colours.
 
 Original image bytes are kept in the IndexedDB database
 `deepseek-harness-skin:pictures`, under the origin the DSH page is served from.
-Skin names, colours and framing are kept in the localStorage key
-`deepseek-harness-skin:state`. Both survive a refresh or a restart and nothing is
+Skin names, colours, framing and the panel position are kept in the localStorage
+key `deepseek-harness-skin:state`. Both survive a refresh or a restart and nothing is
 uploaded to a server. Storage is per browser, per profile and per origin, so two
 setups do not share skins, and clearing that origin's site data clears the custom
 content. A failed upload keeps the previous picture.
@@ -170,8 +176,10 @@ no longer matches those sources, which is the state in which editing the CSS
 appears to do nothing. Day-to-day uploading, colour picking and framing need no
 build.
 
-`tools/smoke.mjs` drives the client half in a DOM stub and checks that it loads,
-that the panel can be interacted with, that a failed save adds neither a skin nor
+`tools/smoke.mjs` drives the client half in a DOM stub (131 checks) and checks
+that it loads, that the panel can be interacted with and dragged — a
+secondary-button drag, a lost pointer capture, a cancelled drag and an
+out-of-range saved position included — that a failed save adds neither a skin nor
 a picture, that settings persist across a reload, that the official look stays
 untouched and that teardown removes what the plugin added. It does not check the
 real CSS cascade or window rendering, so a Windows acceptance run uses the real

@@ -1023,8 +1023,12 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
 /* ── Panel shell ────────────────────────────────────────────────────────── */
 
 #deepseek-harness-skin-panel {
-  width: 340px;
-  max-height: min(74vh, 640px);
+  position: fixed;
+  right: 18px;
+  bottom: 70px;
+  width: min(340px, calc(100vw - 16px));
+  max-height: min(74vh, 640px, calc(100vh - 16px));
+  -webkit-app-region: no-drag;
   overflow: hidden auto;
   border-radius: 16px;
   border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
@@ -1049,6 +1053,17 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
   top: 0;
   z-index: 1;
   background: linear-gradient(var(--skin-panel-bg, #1c1816), var(--skin-panel-bg, #1c1816)), #17222b;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+#deepseek-harness-skin-panel [data-role='head'][data-dragging] {
+  cursor: grabbing;
+}
+
+#deepseek-harness-skin-panel [data-role='close'] {
+  cursor: pointer;
 }
 
 #deepseek-harness-skin-panel [data-role='title'] {
@@ -1475,7 +1490,9 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
   }
 
   #deepseek-harness-skin-panel {
-    width: auto;
+    right: 10px;
+    bottom: 62px;
+    width: min(340px, calc(100vw - 20px));
     max-height: 62vh;
   }
 
@@ -1602,6 +1619,7 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
       customSkins: [],
       sidebarColors: {},
       regionColors: {},
+      panelPosition: null,
       dockOpen: false,
     })
 
@@ -1655,6 +1673,7 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
           customSkins,
           sidebarColors,
           regionColors,
+          panelPosition: normalizePanelPosition(parsed.panelPosition),
           // Deliberately NOT persisted: a panel left open across a restart is
           // clutter, not a preference.
           dockOpen: false,
@@ -2282,6 +2301,97 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
 
     /* ══════════════════════════ the panel ═══════════════════════════════ */
 
+    function normalizePanelPosition(value) {
+      return value && typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0
+        && typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0
+        ? { x: value.x, y: value.y } : null
+    }
+
+    /** Move only the settings panel; the whale remains at its fixed corner. */
+    function bindPanelDrag(panel, store, actions) {
+      const head = panel.querySelector('[data-role="head"]')
+      let saved = store.getSnapshot().panelPosition
+      let position = saved ? { ...saved } : null
+      let drag = null
+      let disposed = false
+
+      const place = (point, rect = panel.getBoundingClientRect()) => {
+        if (!rect.width || !rect.height) return
+        position = {
+          x: Math.min(Math.max(8, window.innerWidth - rect.width - 8), Math.max(8, point.x)),
+          y: Math.min(Math.max(8, window.innerHeight - rect.height - 8), Math.max(8, point.y)),
+        }
+        panel.style.left = `${position.x}px`
+        panel.style.top = `${position.y}px`
+        panel.style.right = 'auto'
+        panel.style.bottom = 'auto'
+      }
+
+      const finish = (event, persist = true) => {
+        if (!drag || (event && event.pointerId !== drag.id)) return
+        const id = drag.id
+        // Clear first: releasing capture dispatches lostpointercapture too.
+        drag = null
+        head.removeAttribute('data-dragging')
+        if (head.hasPointerCapture(id)) head.releasePointerCapture(id)
+        if (persist && !disposed && position) actions.setPanelPosition(position)
+      }
+
+      const update = () => {
+        if (disposed) return
+        const state = store.getSnapshot()
+        if (!state.dockOpen) { finish(); return }
+        if (!drag && state.panelPosition !== saved) {
+          saved = state.panelPosition
+          position = saved ? { ...saved } : null
+        }
+        const rect = panel.getBoundingClientRect()
+        if (!rect.width || !rect.height) return
+        if (position) place(position, rect)
+        else if (rect.left < 8 || rect.top < 8 || rect.right > window.innerWidth - 8 || rect.bottom > window.innerHeight - 8) {
+          place({ x: rect.left, y: rect.top }, rect)
+        }
+      }
+
+      const down = (event) => {
+        if (disposed || drag || !store.getSnapshot().dockOpen || event.button !== 0
+          || event.isPrimary === false || event.target.closest?.('button')) return
+        const rect = panel.getBoundingClientRect()
+        if (!rect.width || !rect.height) return
+        head.setPointerCapture(event.pointerId)
+        drag = { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top }
+        place({ x: rect.left, y: rect.top }, rect)
+        head.setAttribute('data-dragging', '')
+        event.preventDefault()
+      }
+      const move = (event) => {
+        if (disposed || !drag || event.pointerId !== drag.id) return
+        place({ x: event.clientX - drag.x, y: event.clientY - drag.y })
+        event.preventDefault()
+      }
+      const blur = () => finish()
+      const events = { pointerdown: down, pointermove: move,
+        pointerup: finish, pointercancel: finish, lostpointercapture: finish }
+      for (const [type, handler] of Object.entries(events)) head.addEventListener(type, handler)
+      head.setAttribute('title', '按住标题栏拖动面板')
+      window.addEventListener('resize', update)
+      window.addEventListener('blur', blur)
+      const sizeObserver = window.ResizeObserver ? new window.ResizeObserver(update) : null
+      sizeObserver?.observe(panel)
+
+      return {
+        update,
+        dispose() {
+          disposed = true
+          finish(undefined, false)
+          for (const [type, handler] of Object.entries(events)) head.removeEventListener(type, handler)
+          window.removeEventListener('resize', update)
+          window.removeEventListener('blur', blur)
+          sizeObserver?.disconnect()
+        },
+      }
+    }
+
     /** Late-bound repaint hook, set while the panel is mounted. */
     let refreshPanel
 
@@ -2558,6 +2668,7 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
 
       dock.append(panel, handle)
       document.body.append(dock)
+      const dragging = bindPanelDrag(panel, store, actions)
 
       const foot = panel.querySelector('[data-role="foot"]')
       const controls = panel.querySelector('[data-role="controls"]')
@@ -2629,6 +2740,7 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
         }
 
         foot.replaceChildren(...footerNodes(isOff, active))
+        dragging.update()
       }
 
       return {
@@ -2636,6 +2748,7 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
         notify,
         dispose: () => {
           mounted = false
+          dragging.dispose()
           dock.remove()
         },
       }
@@ -2760,6 +2873,11 @@ body[data-dsh-skin='film'][data-ds-dark-theme] {
       const actions = {
         setSkin: (skin) => store.set({ skin: allSkins(store.getSnapshot()).some((item) => item.id === skin) ? skin : OFF }),
         setDockOpen: (open) => store.set({ dockOpen: open === true }),
+        setPanelPosition: (value) => {
+          const position = normalizePanelPosition(value)
+          const previous = store.getSnapshot().panelPosition
+          if (position && (position.x !== previous?.x || position.y !== previous?.y)) store.set({ panelPosition: position })
+        },
         setLevel: (key, value) => {
           const next = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULTS[key] ?? 1
           if (key !== 'artOpacity' && key !== 'veil') return

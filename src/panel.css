@@ -72,8 +72,12 @@
 /* ── Panel shell ────────────────────────────────────────────────────────── */
 
 #deepseek-harness-skin-panel {
-  width: 340px;
-  max-height: min(74vh, 640px);
+  position: fixed;
+  right: 18px;
+  bottom: 70px;
+  width: min(340px, calc(100vw - 16px));
+  max-height: min(74vh, 640px, calc(100vh - 16px));
+  -webkit-app-region: no-drag;
   overflow: hidden auto;
   border-radius: 16px;
   border: 1px solid var(--skin-panel-stroke, rgba(255, 255, 255, 0.16));
@@ -98,6 +102,17 @@
   top: 0;
   z-index: 1;
   background: linear-gradient(var(--skin-panel-bg, #1c1816), var(--skin-panel-bg, #1c1816)), #17222b;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+#deepseek-harness-skin-panel [data-role='head'][data-dragging] {
+  cursor: grabbing;
+}
+
+#deepseek-harness-skin-panel [data-role='close'] {
+  cursor: pointer;
 }
 
 #deepseek-harness-skin-panel [data-role='title'] {
@@ -524,7 +539,9 @@
   }
 
   #deepseek-harness-skin-panel {
-    width: auto;
+    right: 10px;
+    bottom: 62px;
+    width: min(340px, calc(100vw - 20px));
     max-height: 62vh;
   }
 

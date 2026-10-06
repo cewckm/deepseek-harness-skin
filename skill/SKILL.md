@@ -23,6 +23,10 @@ the package bundles no skins and no artwork.
 - Requirements: Node.js `>=20`, `dsh >=0.2.0-rc.2 <0.3.0`.
 - The panel's UI text is Chinese. `外观设置` is the panel title (Appearance
   settings) and `立绘浓度` is picture opacity; quote the labels as they are.
+- The panel can be dragged by its `外观设置` title bar. The position lives in the
+  same localStorage state key as `panelPosition: { x, y }`, is written only when
+  the pointer is released and is clamped 8px inside the viewport; the whale
+  launcher stays in its corner.
 
 ## Commands
 
@@ -74,9 +78,9 @@ take effect?"; the payload also reports the artwork directory and the client
 module graph. Bundled artwork appears under `/deepseek-harness-skin/art/<skin>`;
 pictures the user uploaded never do, because they live in the browser.
 
-`smoke.mjs` (114 checks) covers loading, panel interaction, a failed save,
-persistence, the official look and teardown, but never the real CSS cascade or
-window rendering — send Windows acceptance work to the real Electron window and
+`smoke.mjs` (131 checks) covers loading, panel interaction and dragging, a failed
+save, persistence, the official look and teardown, but never the real CSS cascade
+or window rendering — send Windows acceptance work to the real Electron window and
 look at the official look, the wallpaper and the region transparency.
 
 ## Safety rules

@@ -85,6 +85,7 @@ class StubElement {
     this.value = ''
     this.type = ''
     this.textContent = ''
+    this.capturedPointers = new Set()
     const self = this
     this.style = {
       setProperty(name, value) {
@@ -212,10 +213,10 @@ class StubElement {
   }
 
   closest(selector) {
-    const want = parseSelector(selector)
+    const wants = selector.split(',').map(parseSelector)
     let node = this
     while (node instanceof StubElement) {
-      if (node.matches(want)) return node
+      if (wants.some((want) => node.matches(want))) return node
       node = node.parentElement
     }
     return null
@@ -239,9 +240,26 @@ class StubElement {
     return out
   }
 
-  /** Geometry, faked: every stub is a full-viewport rectangle at the origin. */
+  /** Measured panel geometry, enough to exercise drag bounds without layout. */
   getBoundingClientRect() {
+    if (this.id === 'deepseek-harness-skin-panel' || this.dataset.role === 'head') {
+      const panel = this.id === 'deepseek-harness-skin-panel' ? this : this.parentElement
+      const dimensions = panel.geometry ?? { x: 930, y: 136, width: 338, height: 608 }
+      const width = Math.min(dimensions.width, Math.max(0, window.innerWidth - 16))
+      const height = this.dataset.role === 'head' ? 48 : Math.min(dimensions.height, Math.max(0, window.innerHeight - 16))
+      const left = Number.parseFloat(panel.style.left)
+      const top = Number.parseFloat(panel.style.top)
+      const x = Number.isFinite(left) ? left : dimensions.x
+      const y = Number.isFinite(top) ? top : dimensions.y
+      return { x, y, top: y, left: x, right: x + width, bottom: y + height, width, height }
+    }
     return { x: 0, y: 0, top: 0, left: 0, right: 1280, bottom: 800, width: 1280, height: 800 }
+  }
+
+  setPointerCapture(id) { this.capturedPointers.add(id) }
+  hasPointerCapture(id) { return this.capturedPointers.has(id) }
+  releasePointerCapture(id) {
+    if (this.capturedPointers.delete(id)) queueMicrotask(() => this.fire('lostpointercapture', { pointerId: id }))
   }
 
   querySelectorAll(selector) {
@@ -298,6 +316,7 @@ const document = {
 }
 
 const storage = new Map()
+let storageWrites = 0
 const windowListeners = new Map()
 /** Which way the artwork probes settle. Set to 'missing' for the degraded path. */
 let imageVerdict = 'ready'
@@ -374,7 +393,7 @@ const window = {
   document,
   localStorage: {
     getItem: (key) => (storage.has(key) ? storage.get(key) : null),
-    setItem: (key, value) => storage.set(key, String(value)),
+    setItem: (key, value) => { storageWrites += 1; storage.set(key, String(value)) },
     removeItem: (key) => storage.delete(key),
   },
   indexedDB: {
@@ -602,6 +621,91 @@ frame('x', 80)
 setRange('artOpacity', 75)
 check('hidden customization events cannot paint official appearance', untouchedOfficial() && officialStylesSurvive())
 setRange('artOpacity', 100)
+
+/* Dragging is a panel interaction: it must not touch the skin or the fixed
+   whale, save during every move, or capture clicks on the close button. */
+const dragPanel = document.getElementById('deepseek-harness-skin-panel')
+const dragHeader = input('head')
+const panelRect = () => dragPanel.getBoundingClientRect()
+const pointer = (type, pointerId, clientX, clientY, extra = {}) => dragHeader.fire(type, {
+  pointerId, clientX, clientY, button: 0, buttons: 1, isPrimary: true, ...extra,
+})
+const dragStartRect = panelRect()
+const beforeDragWrites = storageWrites
+pointer('pointerdown', 11, dragStartRect.x + 40, dragStartRect.y + 20)
+check('dragging the title captures its pointer', dragHeader.hasPointerCapture(11))
+pointer('pointermove', 12, 2000, 2000)
+check('a different pointer cannot move the panel', panelRect().x === dragStartRect.x && panelRect().y === dragStartRect.y)
+pointer('pointermove', 11, 2000, 2000)
+const lowerRightRect = panelRect()
+check('dragging beyond the viewport keeps the whole panel inside its margin',
+  lowerRightRect.x >= 8 && lowerRightRect.y >= 8 && lowerRightRect.right <= window.innerWidth - 8
+  && lowerRightRect.bottom <= window.innerHeight - 8 && lowerRightRect.x !== dragStartRect.x)
+check('pointer moves do not persist a new position on every frame', storageWrites === beforeDragWrites && stored().panelPosition === null)
+pointer('pointerup', 11, 2000, 2000)
+await settle()
+check('releasing a drag saves the reached position once and releases capture',
+  stored().panelPosition.x === lowerRightRect.x && stored().panelPosition.y === lowerRightRect.y
+  && storageWrites === beforeDragWrites + 1 && !dragHeader.hasPointerCapture(11))
+
+const beforeIgnoredDrag = panelRect()
+pointer('pointerdown', 20, beforeIgnoredDrag.x + 10, beforeIgnoredDrag.y + 10, { button: 2, buttons: 2 })
+pointer('pointermove', 20, 10, 10)
+pointer('pointerup', 20, 10, 10)
+check('right mouse clicks do not start a panel drag',
+  !dragHeader.hasPointerCapture(20) && panelRect().x === beforeIgnoredDrag.x && panelRect().y === beforeIgnoredDrag.y)
+pointer('pointerdown', 21, beforeIgnoredDrag.x + 10, beforeIgnoredDrag.y + 10, { target: input('close') })
+pointer('pointermove', 21, 10, 10)
+pointer('pointerup', 21, 10, 10)
+check('pressing the title close button cannot drag the panel',
+  !dragHeader.hasPointerCapture(21) && panelRect().x === beforeIgnoredDrag.x && panelRect().y === beforeIgnoredDrag.y)
+
+pointer('pointerdown', 22, beforeIgnoredDrag.x + 10, beforeIgnoredDrag.y + 10)
+pointer('pointermove', 22, -1000, -1000)
+check('dragging beyond the upper-left viewport edge keeps an accessible margin', panelRect().x === 8 && panelRect().y === 8)
+pointer('pointercancel', 22, -1000, -1000)
+await settle()
+const canceledRect = panelRect()
+pointer('pointermove', 22, 1000, 1000)
+check('a canceled pointer can no longer move the panel',
+  !dragHeader.hasPointerCapture(22) && panelRect().x === canceledRect.x && panelRect().y === canceledRect.y)
+
+pointer('pointerdown', 23, panelRect().x + 10, panelRect().y + 10)
+pointer('pointermove', 23, 210, 170)
+dragHeader.capturedPointers.delete(23)
+pointer('lostpointercapture', 23, 210, 170)
+await settle()
+const lostCaptureRect = panelRect()
+pointer('pointermove', 23, 500, 500)
+check('losing pointer capture finishes the drag', panelRect().x === lostCaptureRect.x && panelRect().y === lostCaptureRect.y)
+
+pointer('pointerdown', 24, panelRect().x + 10, panelRect().y + 10)
+pointer('pointermove', 24, panelRect().x + 30, panelRect().y + 30)
+const closeDragRect = panelRect()
+input('close').fire('click')
+await settle()
+check('closing during a drag releases capture and remembers the reached position',
+  dock.dataset.open === 'false' && !dragHeader.hasPointerCapture(24)
+  && stored().panelPosition.x === closeDragRect.x && stored().panelPosition.y === closeDragRect.y)
+handle.fire('click')
+check('reopening settings preserves the dragged position', panelRect().x === closeDragRect.x && panelRect().y === closeDragRect.y)
+window.innerWidth = 360
+window.innerHeight = 480
+for (const handler of windowListeners.get('resize') ?? []) handler()
+const resizedPanel = panelRect()
+check('a smaller viewport brings the complete panel back into view',
+  resizedPanel.x >= 8 && resizedPanel.y >= 8 && resizedPanel.right <= window.innerWidth - 8 && resizedPanel.bottom <= window.innerHeight - 8)
+window.innerWidth = 1280
+window.innerHeight = 800
+for (const handler of windowListeners.get('resize') ?? []) handler()
+const resizedStart = panelRect()
+pointer('pointerdown', 25, resizedStart.x + 10, resizedStart.y + 10)
+pointer('pointermove', 25, 210, 110)
+pointer('pointerup', 25, 210, 110)
+await settle()
+const savedPanelPosition = { ...stored().panelPosition }
+check('moving settings keeps the whale anchored and official appearance untouched',
+  handle.style.left === undefined && handle.style.top === undefined && untouchedOfficial() && officialStylesSurvive())
 
 const initialNewColor = input('new-color').value
 input('new-hue').value = '120'
@@ -834,6 +938,10 @@ exportsObject.apply(nextCtx)
 await settle()
 dock = document.getElementById('deepseek-harness-skin-dock')
 handle = document.getElementById('deepseek-harness-skin-handle')
+handle.fire('click')
+const reloadedPanel = document.getElementById('deepseek-harness-skin-panel').getBoundingClientRect()
+check('client reload restores the saved settings window position',
+  reloadedPanel.x === savedPanelPosition.x && reloadedPanel.y === savedPanelPosition.y)
 check('reload restores the selected uploaded original without a Host route',
   art().startsWith('url("blob:') && [...blobUrls].some(([url, blob]) => art() === `url("${url}")` && blob === replacement))
 check('reload restores independent picture framing, colors and regions',
@@ -872,6 +980,7 @@ for (const id of ['studio', 'neon', 'sakura', 'film']) pictureRecords.set(id, { 
 for (const skin of fixtureSkins) pictureRecords.set(skin.id, { id: skin.id, name: `${skin.id}.png`, blob: secondFile })
 storage.set(STORAGE_KEY, JSON.stringify({
   skin: 'neon', artOpacity: 1.8, veil: 0, decor: 0,
+  panelPosition: { x: null, y: -20 },
   customSkins: [...fixtureSkins, { id: 'studio', name: 'Invalid preset', palette: 'studio' }, { id: 'custom-bad', name: 'Invalid palette', palette: 'missing' }],
   sidebarColors: { neon: '#112233', [fixtureSkins[0].id]: '#aabbcc', unknown: '#ffffff' },
   regionColors: {
@@ -899,6 +1008,7 @@ check('migration removes former built-in and unknown customization entries',
   migrated.framing.neon === undefined && migrated.sidebarColors.neon === undefined && migrated.regionColors.neon === undefined
   && migrated.framing.unknown === undefined && migrated.sidebarColors.unknown === undefined && migrated.regionColors.unknown === undefined)
 check('migration clamps old exaggerated strength to original 100 percent and keeps zero shading', migrated.artOpacity === 1 && migrated.veil === 0)
+check('malformed saved panel coordinates fall back to the default position', migrated.panelPosition === null)
 check('migration preserves valid custom colors and sanitizes unsafe region values',
   migrated.sidebarColors[fixtureSkins[0].id] === '#aabbcc' && migrated.regionColors[fixtureSkins[0].id].input === undefined
   && migrated.regionColors[fixtureSkins[0].id].code.opacity === 1 && migrated.regionColors[fixtureSkins[0].id].code.text === null)
@@ -926,12 +1036,21 @@ holdImageLoads = true
 exportsObject.apply(nextCtx)
 await settle()
 check('the delayed reload scenario has an unfinished local image decode', pendingImageLoads.length > 0)
+const latePanel = document.getElementById('deepseek-harness-skin-panel')
+const lateHead = latePanel.querySelector('[data-role="head"]')
+document.getElementById('deepseek-harness-skin-handle').fire('click')
+const lateRect = latePanel.getBoundingClientRect()
+lateHead.fire('pointerdown', { pointerId: 90, button: 0, clientX: lateRect.x + 10, clientY: lateRect.y + 10 })
+lateHead.fire('pointermove', { pointerId: 90, clientX: 350, clientY: 220 })
+const beforeDisposedDragWrites = storageWrites
 const lateObserver = [...observers].reverse().find((observer) => observer.targets.some((target) =>
   (target.options?.attributeFilter ?? []).includes('data-ds-dark-theme')))
 computedToken = 'rgb(19, 19, 19)'
 lateObserver?.deliver('data-ds-dark-theme')
 nextDisposer()
 const afterLateDisposePublishes = tokenPublishes
+lateHead.fire('pointerup', { pointerId: 90, clientX: 350, clientY: 220 })
+for (const handler of windowListeners.get('resize') ?? []) handler()
 holdImageLoads = false
 for (const finish of pendingImageLoads.splice(0)) finish()
 await settle()
@@ -939,6 +1058,10 @@ check('late image and scheme callbacks cannot repaint a disposed skin instance',
   untouchedOfficial() && officialStylesSurvive() && head.children.length === 0
   && document.getElementById('deepseek-harness-skin-dock') === null && tokenPublishes === afterLateDisposePublishes)
 check('a decode completing after disposal still releases its temporary Blob URL', blobUrls.size === 0)
+check('disposing a mid-drag panel releases its pointer without saving a late position',
+  !lateHead.hasPointerCapture(90) && storageWrites === beforeDisposedDragWrites
+  && (lateHead.listeners.get('pointerdown')?.size ?? 0) === 0 && (lateHead.listeners.get('pointermove')?.size ?? 0) === 0
+  && (windowListeners.get('resize')?.size ?? 0) === 0 && (windowListeners.get('blur')?.size ?? 0) === 0)
 
 /* ── report ─────────────────────────────────────────────────────────────── */
 const passed = checks.filter((entry) => entry.ok).length
