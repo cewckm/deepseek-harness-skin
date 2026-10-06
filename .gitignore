@@ -1,0 +1,21 @@
+# Local state and secrets — never publish these.
+_token.txt
+.git-credentials
+config.json
+*.log
+
+# Dependencies and build leftovers.
+node_modules/
+.cache/
+
+# Screenshots and acceptance evidence stay on the machine that took them.
+preview/
+*-backup/
+*-qa/
+
+# Editor and OS noise.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
